@@ -87,4 +87,4 @@ Am definit ca expresii lambda câteva macro-uri utile pentru lucrul cu Booleene 
 
 Am definit ca expresii lambda câteva macro-uri utile pentru lucrul cu perechi (PAIR, FIRST, SECOND).
 
-Am definit ca expresii lambda câteva macro-uri utile pentru lucrul cu numere naturale (N0, N1, N2, SUCC,
+Am definit ca expresii lambda câteva macro-uri utile pentru lucrul cu numere naturale (N0, N1, N2, SUCC, PRED, ADD, SUB, MULT).
