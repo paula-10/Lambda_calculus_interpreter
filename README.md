@@ -1,90 +1,96 @@
-În cadrul acestei teme am realizat un interpretor de expresii lambda în Haskell.
+In this assignment, I implemented a lambda expression interpreter in Haskell.
 
-O să definim o expresie lambda cu ajutorul următorului TDA:
+We will define a lambda expression using the following ADT:
 
+haskell
+Copy code
 data Lambda = Var String
             | App Lambda Lambda
             | Abs String Lambda
-            
-Variabilele sunt declarate de tipul String, pentru simplitate o să considerăm variabilă orice șir de caractere format numai din litere mici ale alfabetului englez.
+Variables are declared as type String. For simplicity, we'll consider any string composed solely of lowercase English letters to be a variable.
 
 1. Evaluation
 Reminder:
-redex - o expresie reductibilă, i.e. are forma (λx.e1 e2)
-normal-form - expresie care nu mai poate fi redusa (nu contine niciun redex)
 
-Evaluarea unei expresii lambda constă în realizarea de β-reducerii până ajungem la o expresie echivalentă în formă normală.Un detaliu de implementare este că înainte de a realiza β-reducerea, va trebui să rezolvăm posibilele coliziuni de nume.
-Dacă am încerca să reducem un redex fără a face substituții textuale există riscul de a pierde întelesul original al expresiei.
-Spre exemplu redex-ul: (λx.λy.(x  y) λx.y), ar fi redus la: λy.(λx.y  y). Acest efect nedorit are denumirea intuitivă de variable-capture: Variabila inițial liberă y
- a devenit legată după reducere.
-Puteți observa că expresia și-a pierdut sensul original, pentru că y-ul liber din 
-λx.y e acum bound de λy. din expresia în care a fost înlocuit.
-Astfel, reducerea corectă ar fi: λa.(λx.y  a).
-Pentru a detecta și rezolva variable capture, o să pregătim câteva funcții ajutătoare:
-- funcția auxiliară vars care returnează o listă cu toate String-urile care reprezintă variabile într-o expresie.
-- funcția auxiliară freeVars care returnează o listă cu toate String-urile care reprezintă variabile libere într-o expresie. (notă: dacă o variabilă este liberă în expresie în mai multe contexte, o să apară o singură dată în listă).
-- funcția auxiliară newVars care primește o listă de String-uri și intoarce cel mai mic String lexicografic care nu apare în listă (e.g. new_vars [“a”, “b”, “c”] o să întoarcă “d”).
-- funcția isNormalForm care verifică daca o expresie este în formă normală.
-- funcția reduce care realizează β-reducerea unui redex luând în considerare și coliziunile de nume. Funcția primește redex-ul 'deconstruit' și returnează expresia rezultată.
+redex: A reducible expression, i.e., of the form (λx.e1 e2)
+normal-form: An expression that can no longer be reduced (contains no redex).
+Evaluating a lambda expression involves performing β-reductions until we reach an equivalent expression in normal form. An implementation detail is that before performing β-reduction, we must resolve potential name collisions. Attempting to reduce a redex without making textual substitutions risks losing the original meaning of the expression. For example, the redex: (λx.λy.(x y) λx.y) would be reduced to: λy.(λx.y y). This unwanted effect is known as variable capture: The initially free variable y has become bound after reduction.
+
+You can observe that the expression has lost its original meaning because the free y from λx.y is now bound by the λy from the expression it was substituted into. Thus, the correct reduction would be: λa.(λx.y a).
+
+To detect and resolve variable capture, we will prepare some helper functions:
+
+vars: Auxiliary function that returns a list of all Strings representing variables in an expression.
+freeVars: Auxiliary function that returns a list of all Strings representing free variables in an expression. (Note: if a variable is free in the expression in multiple contexts, it will appear only once in the list).
+newVars: Auxiliary function that takes a list of Strings and returns the smallest lexicographical String that does not appear in the list (e.g., newVars ["a", "b", "c"] will return "d").
+isNormalForm: Function that checks if an expression is in normal form.
+reduce: Function that performs β-reduction of a redex, considering name collisions. The function takes the deconstructed redex and returns the resulting expression.
+haskell
+Copy code
 reduce :: String -> Lambda -> Lambda -> Lambda
-reduce x e_1 e_2 = undefined
--- oriunde apare variabila x în e_1, este inlocuită cu e_2
+reduce x e1 e2 = undefined
+-- anywhere the variable x appears in e1, it is replaced with e2
+Now that we can reduce a redex, we want to reduce an expression to its normal form. To do this, we need to implement a strategy for choosing the next redex to reduce and apply it until no redex remains. In this assignment, we will implement two strategies: Normal and Applicative.
 
-Acum că putem reduce un redex, vrem să reducem o expresie la forma ei normală. Pentru asta trebuie să implementăm o strategie de alegere a redex-ului care urmează să fie redus, și să o aplicăm până nu mai există niciun redex. În această temă o să implementăm 2 strategii: Normală și Aplicativă.
-Normală: se alege cel mai exterior, cel mai din stânga redex
-Aplicativă: se alege cel mai interior, cel mai din stânga redex
-O să facem reducerea „step by step”, implementăm o funcție care reduce doar următorul redex comform unei strategii. Apoi aplicăm acesți pași până expresia rămasă este în formă normală. Functiile care ne vor ajuta sa implementam cele doua strategii sunt:
-- funcția normalStep care aplică un pas de reducere după strategia Normală.
-- funcția applicativeStep care aplică un pas de reducere după strategia Aplicativă.
-- funcția simplify, care primeste o funcție de step și o aplică până expresia rămâne în formă normală, și întoarce o listă cu toți pași intermediari ai reduceri.
+Normal: Chooses the outermost, leftmost redex.
+Applicative: Chooses the innermost, leftmost redex.
+We will perform the reduction "step by step," implementing a function that reduces only the next redex according to a strategy. Then we apply these steps until the remaining expression is in normal form. The functions that will help us implement these two strategies are:
 
+normalStep: Function that applies a reduction step following the Normal strategy.
+applicativeStep: Function that applies a reduction step following the Applicative strategy.
+simplify: Function that takes a step function and applies it until the expression is in normal form, returning a list of all intermediate steps of the reduction.
 2. Parsing
-Momentan putem să evaluăm expresii definite tot de noi sub formă de cod. Pentru a avea un interpretor funcțional, trebuie să putem lua expresii sub forma de șiruri de caractere și să le transformăm în TDA-uri (acest proces se numește parsare).
-O gramatică pentru expresii lambda ar putea fi:
+Currently, we can evaluate expressions defined by us in the form of code. To have a functional interpreter, we need to take expressions in the form of strings and transform them into ADTs (this process is called parsing). A grammar for lambda expressions could be:
+
+bnf
+Copy code
 <lambda> ::= <variable> | '\' <variable> '.' <lambda> | (<lambda> <lambda>)
-<variable> ::= <variable><alpha> | <alpha> 
+<variable> ::= <variable><alpha> | <alpha>
 <alpha> ::= 'a' | 'b' | 'c' | ... | 'z'
+The parseLambda function parses a String and returns an expression.
 
-Funcția parseLambda parsează un String și returnează o expresie
+The parser that you need to implement has the definition:
 
-Parserul care trebuie să îl implementați are definiția:
+haskell
+Copy code
 newtype Parser a = Parser {
     parse :: String -> Maybe(a, String)
 }
-Obervați că tipul care îl întoarce funcția de parsare este Maybe(a, String), el întoarce Nothing dacă nu a putut parsa expresia sau Just (x, s) dacă a parsat x, iar din String-ul original a rămas sufix-ul s.
+Note that the type returned by the parsing function is Maybe(a, String). It returns Nothing if it could not parse the expression, or Just (x, s) if it parsed x and the original string's suffix is s.
 
-3. Steps towards a programming language
-Folosind parserul și evaluatorul anterior, putem să evaluăm orice rezultat computabil, expresiile lambda fiind suficient de expresive, însă este foarte greu să scrii astfel de expresii. Pentru a fi mai ușor de folosit, vrem să putem denumi anumite sub-expresii pentru a le putea refolosi ulterior. Pentru asta o să folosim conceptul de macro. Primul pas ar fi să extindem definiția unei expresii cu un constructor Macro care acceptă un String ca parametru (denumirea macro-ului). O să introducem și sintaxa: orice șir de caractere format numai din litere mari ale alfabetului englez si cifre e considerat un macro.
+3. Steps towards a Programming Language
+Using the previous parser and evaluator, we can evaluate any computable result, as lambda expressions are sufficiently expressive, but it is very difficult to write such expressions. To make it easier to use, we want to be able to name certain sub-expressions for later reuse. For this, we will use the concept of macros. The first step would be to extend the definition of an expression with a constructor Macro that accepts a String as a parameter (the macro's name). We will also introduce the syntax: any string composed solely of uppercase English letters and digits is considered a macro.
 
-Câteva exemple de expresii cu macro-uri sunt: 
-TRUE 
-λx.FALSE 
+Some examples of expressions with macros are:
+
+TRUE
+λx.FALSE
 λx(NOT λy.AND)
+To use macros, we need to introduce the notion of a computational context. The context in which we evaluate an expression is simply a dictionary of macro names and the expressions these names replace. Thus, when we evaluate a macro, we simply perform textual substitution with the expression found in the dictionary.
 
-Pentru a putea folosi macro-uri, trebuie să introducem noțiunea de context computațional. Contextul în care evaluăm o expresie este pur și simplu un dicționar de nume de macro-uri și expresii pe care aceste nume le înlocuiesc. Astfel când evaluăm un macro, facem pur și simpu substituție textuală cu expresia găsită în dicționar.
+If we do not find the macro in the context, we will not know how to evaluate the expression, so we would like to return an error. We will extend the returned data type to Either String [Lambda] and return Left in case of an error and Right if the evaluation completes successfully.
 
-În cazul în care nu găsim macro-ul în context, nu o să știm cum să evaluăm expresia, asa că am vrea să întoarcem o eroare. O să extindem tipul de date întors la Either String [Lambda] și o să întoarce Left în caz de eroare și Right în cazul în care evaluarea se termina cu succes.
+The simplifyCtx function takes a context and an expression that may contain macros, performs the macro substitutions (or returns an error if it fails), and evaluates the resulting expression using the given step strategy.
 
-Funcția simplifyCtx ia un context și o expresie care poate să conțină macro-uri, face substituțiile macro-urilor (sau returnează eroare dacă nu reușeste) și evaluează expresia rezultată folosind strategia de step primită.
+Working with Maybe or Either can become complicated if we use case statements on all variables. To ease working with them, there are monads defined for both Maybe and Either, and you can use do notation to simplify your work. The lookup function is very useful for working with dictionaries (lists of pairs).
 
-Codul atunci când lucrezi cu Maybe sau Either poate să devina complicat dacă folosim case-uri pe toate variabilele, pentru a ușura lucrul cu ele există monade definite atât peste tipul de date Maybe cât și peste Either, poți folosi do notation să îți ușurezi viața.
-funcția lookup este foarte utilă pentru lucrul cu dicționare (liste de perechi)
-Ultimul pas ca să ne putem folosi de macro-uri e să găsim o metodă de a le defini. Pentru asta o sa definim conceptul de linie de cod:
+The last step to use macros is to find a way to define them. For this, we will define the concept of a line of code:
 
+haskell
+Copy code
 data Line = Eval Lambda
           | Binding String Lambda
-O linie de cod poate să fie ori o expresie lambda, ori o definiție de macro. Astfel daca o sa evaluam mai multe linii de cod, în expresii o sa ne putem folosi de macro-urile definite anterior.
+A line of code can be either a lambda expression or a macro definition. Thus, if we evaluate multiple lines of code, we can use previously defined macros in expressions.
 
-Am modificat parser-ul astfel încât să parsez și expresii care conțin macro-uri.
-Am implementat funcția parseLine care parseaza o linie de cod, dacă găsește erori o să întoarcă o eroare (sub formă de String).
+I modified the parser to also parse expressions containing macros. I implemented the parseLine function that parses a line of code and returns an error (in the form of a String) if it finds errors.
 
-4.Default Library
-Acum că avem un interpretor funcțional pentru calcul lambda, hai să definim și câteva expresii uzuale, ca să le putem folosi ca un context default pentru interpretorul nostru (un fel de standard library).
+4. Default Library
+Now that we have a functional interpreter for lambda calculus, let's define some common expressions to use as a default context for our interpreter (a kind of standard library).
 
-În fișierul Default.hs sunt deja definiti câțiva combinatori. Definiții restul expresiilor.
+In the Default.hs file, several combinators are already defined. Define the rest of the expressions.
 
-Am definit ca expresii lambda câteva macro-uri utile pentru lucrul cu Booleene (TRUE, FALSE, AND, OR, NOT, XOR).
+I defined as lambda expressions some useful macros for working with Booleans (TRUE, FALSE, AND, OR, NOT, XOR).
 
-Am definit ca expresii lambda câteva macro-uri utile pentru lucrul cu perechi (PAIR, FIRST, SECOND).
+I defined as lambda expressions some useful macros for working with pairs (PAIR, FIRST, SECOND).
 
-Am definit ca expresii lambda câteva macro-uri utile pentru lucrul cu numere naturale (N0, N1, N2, SUCC, PRED, ADD, SUB, MULT).
+I defined as lambda expressions some useful macros for working with natural numbers (N0, N1, N2, SUCC, PRED, ADD, SUB, MULT).
